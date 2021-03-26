@@ -3,7 +3,8 @@
 
 # 基础镜像，按照季度，月度更新。不影响应用镜像的构建。
 
-FROM pythonstock/pythonstock:base-2020-07
+#FROM pythonstock/pythonstock:base-${NOW_MONTH}
+FROM pythonstock/pythonstock:base-2021-03
 
 WORKDIR /data
 

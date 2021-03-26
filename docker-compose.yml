@@ -1,8 +1,9 @@
 version: "3"
 services:
     stock:
-        image: pythonstock/pythonstock:latest
-        container_name: stock
+        build: ./
+        #image: pythonstock/pythonstock:base-2021-03
+        container_name: mystock
         ports:
             - "8888:8888"
             - "9999:9999"
@@ -21,7 +22,7 @@ services:
             LC_CTYPE: zh_CN.UTF-8
             PYTHONIOENCODING: utf-8
             # 测试使用，自己需注册，申请：https://tushare.pro/user/token
-            TUSHARE_TOKEN: 007b2f24bc3afb5ff5c604b0aee583956840210348169bc2436bddf9
+            TUSHARE_TOKEN: 9a742f208532e6301ceb4ddca014e85517c96cdeb7c7d3afa9fe7cf3
         links:
             - mysqldb:mysqldb
         restart: always

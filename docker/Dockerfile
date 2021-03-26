@@ -6,7 +6,7 @@
 # https://hub.docker.com/_/python?tab=tags&page=1&name=3.6-slim-stretch
 # 用这个做为基础镜像，防止每次都进行构建。
 
-FROM docker.io/python:3.6-slim-stretch
+FROM docker.io/python:3.7-slim-stretch
 
 # https://opsx.alibaba.com/mirror
 # 使用阿里云镜像地址。修改debian apt 更新地址，pip 地址，设置时区。
@@ -27,7 +27,8 @@ ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
 #安装 mysqlclient tushare (pandas ,numpy) tornado bokeh
 # apt-get autoremove -y 删除没有用的依赖lib。减少镜像大小。1MB 也要节省。
 # apt-get --purge remove 软件包名称 , 删除已安装包（不保留配置文件)。
-RUN apt-get update && apt-get install -y gcc make axel python3-dev default-libmysqlclient-dev libxml2-dev cron supervisor && \
+RUN apt-get update && apt-get install -y gcc make axel python3-dev default-libmysqlclient-dev libxml2-dev cron supervisor --assume-yes apt-utils && \
+    pip3 install --upgrade pip && \
     pip3 install mysqlclient sqlalchemy && \
     pip3 install requests && \
     pip3 install lxml bs4 && \
@@ -56,12 +57,12 @@ RUN apt-get update && apt-get install -y gcc make axel python3-dev default-libmy
 
 RUN echo `date +%Y-%m-%d:%H:%M:%S` >> /etc/docker.build && \
     sed -i -e 's/executemany(statement/executemany(statement.replace\("INSERT INTO","INSERT IGNORE INTO")/g' \
-        /usr/local/lib/python3.6/site-packages/sqlalchemy/dialects/mysql/mysqldb.py && \
+        /usr/local/lib/python3.7/site-packages/sqlalchemy/dialects/mysql/mysqldb.py && \
     rm -f /etc/cron.daily/apt-compat /etc/cron.daily/dpkg /etc/cron.daily/passwd && \
     sed -i -e 's/itertools\.izip/zip/g' \
-    /usr/local/lib/python3.6/site-packages/torndb.py  && \
+    /usr/local/lib/python3.7/site-packages/torndb.py  && \
     sed -i -e 's/\+ CONVERSIONS\[field_type\]/\+ \[CONVERSIONS\[field_type\],bytes\]/g' \
-    /usr/local/lib/python3.6/site-packages/torndb.py
+    /usr/local/lib/python3.7/site-packages/torndb.py
 
 #增加语言utf-8
 ENV LANG=zh_CN.UTF-8

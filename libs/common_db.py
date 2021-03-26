@@ -8,13 +8,19 @@ import datetime
 import time
 import sys
 import os
-import MySQLdb
 from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy.types import NVARCHAR
 from sqlalchemy import inspect
 import tushare as ts
 import pandas as pd
 import traceback
+
+
+os.environ.setdefault('MYSQL_HOST', "localhost")
+os.environ.setdefault('MYSQL_USER', "root")
+os.environ.setdefault('MYSQL_PWD', "mysqldb")
+os.environ.setdefault('MYSQL_DB', "stock_data")
 
 # 使用环境变量获得数据库。兼容开发模式可docker模式。
 MYSQL_HOST = os.environ.get('MYSQL_HOST') if (os.environ.get('MYSQL_HOST') != None) else "mariadb"
@@ -23,16 +29,10 @@ MYSQL_PWD = os.environ.get('MYSQL_PWD') if (os.environ.get('MYSQL_PWD') != None)
 MYSQL_DB = os.environ.get('MYSQL_DB') if (os.environ.get('MYSQL_DB') != None) else "stock_data"
 
 print("MYSQL_HOST :", MYSQL_HOST, ",MYSQL_USER :", MYSQL_USER, ",MYSQL_DB :", MYSQL_DB)
-MYSQL_CONN_URL = "mysql+mysqldb://" + MYSQL_USER + ":" + MYSQL_PWD + "@" + MYSQL_HOST + ":3306/" + MYSQL_DB + "?charset=utf8"
+MYSQL_CONN_URL = "mysql+pymysql://" + MYSQL_USER + ":" + MYSQL_PWD + "@" + MYSQL_HOST + ":3306/" + MYSQL_DB + "?charset=utf8"
 print("MYSQL_CONN_URL :", MYSQL_CONN_URL)
 
-# 定义 获得 token 方法
-def get_tushare_token():
-    tushare_token = os.environ.get('TUSHARE_TOKEN')
-    if tushare_token != None:
-        return tushare_token
-    else:
-        return ""
+
 
 def engine():
     engine = create_engine(
@@ -42,7 +42,7 @@ def engine():
 
 
 def engine_to_db(to_db):
-    MYSQL_CONN_URL_NEW = "mysql+mysqldb://" + MYSQL_USER + ":" + MYSQL_PWD + "@" + MYSQL_HOST + ":3306/" + to_db + "?charset=utf8"
+    MYSQL_CONN_URL_NEW = "mysql+pymysql://" + MYSQL_USER + ":" + MYSQL_PWD + "@" + MYSQL_HOST + ":3306/" + to_db + "?charset=utf8"
     engine = create_engine(
         MYSQL_CONN_URL_NEW,
         encoding='utf8', convert_unicode=True)
@@ -51,25 +51,24 @@ def engine_to_db(to_db):
 
 # 通过数据库链接 engine。
 def conn():
-    try:
-        db = MySQLdb.connect(MYSQL_HOST, MYSQL_USER, MYSQL_PWD, MYSQL_DB, charset="utf8")
-        # db.autocommit = True
-    except Exception as e:
-        print("conn error :", e)
-    db.autocommit(on=True)
-    return db.cursor()
+    Session = sessionmaker(engine())
+    session = Session()
+    return session
+
+def delete(table_name, tj_key=None, tj_val=None, is_truncate=False):
+    con = conn()
+    if is_truncate:
+        con.execute('TRUNCATE TABLE `%s`;' % table_name)
+    else:
+        con.execute(
+            "DELETE FROM `%s` WHERE `%s`='%s';" % (table_name, tj_key, tj_val))
 
 
 # 定义通用方法函数，插入数据库表，并创建数据库主键，保证重跑数据的时候索引唯一。
-def insert_db(data, table_name, write_index, primary_keys):
+def insert_db(data, table_name, write_index, primary_keys, is_truncate=False):
     # 插入默认的数据库。
-    insert_other_db(MYSQL_DB, data, table_name, write_index, primary_keys)
-
-
-# 增加一个插入到其他数据库的方法。
-def insert_other_db(to_db, data, table_name, write_index, primary_keys):
     # 定义engine
-    engine_mysql = engine_to_db(to_db)
+    engine_mysql = engine()
     # 使用 http://docs.sqlalchemy.org/en/latest/core/reflection.html
     # 使用检查检查数据库表是否有主键。
     insp = inspect(engine_mysql)
@@ -78,17 +77,31 @@ def insert_other_db(to_db, data, table_name, write_index, primary_keys):
     if write_index:
         # 插入到第一个位置：
         col_name_list.insert(0, data.index.name)
-    print(col_name_list)
-    data.to_sql(name=table_name, con=engine_mysql, schema=to_db, if_exists='append',
+    con = engine_mysql.connect()
+
+    if is_truncate:
+        delete(table_name, is_truncate=is_truncate)
+    data.to_sql(name=table_name, con=con, if_exists='append',
                 dtype={col_name: NVARCHAR(length=255) for col_name in col_name_list}, index=write_index)
+
     # 判断是否存在主键
-    if insp.get_primary_keys(table_name) == []:
-        with engine_mysql.connect() as con:
-            # 执行数据库插入数据。
-            try:
-                con.execute('ALTER TABLE `%s` ADD PRIMARY KEY (%s);' % (table_name, primary_keys))
-            except  Exception as e:
-                print("################## ADD PRIMARY KEY ERROR :", e)
+    if insp.get_pk_constraint(table_name) == []:
+        try:
+            con.execute('ALTER TABLE `%s` ADD PRIMARY KEY (%s);' % (table_name, primary_keys))
+        except  Exception as e:
+            print("################## ADD PRIMARY KEY ERROR :", e)
+
+
+#
+# def existed_record(data, table_name, primary_keys):
+#     engine_mysql = engine()
+#     keys = primary_keys.split(',')
+#     sql = "select 1 from {} where ".format(table_name)
+#     for i in range(len(keys)):
+#         sql += "{}='{}'".format(keys[i], data.index.values[i])
+#         if i != (len(keys) - 1):
+#             sql += ' and '
+#     return pd.read_sql(sql, engine_mysql)
 
 
 # 插入数据。

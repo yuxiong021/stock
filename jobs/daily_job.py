@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 
-import libs.common as common
+import libs.common_db as common
 import sys
 import os
 import time

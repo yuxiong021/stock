@@ -8,7 +8,7 @@ from tornado import gen
 import tornado.httpserver
 import tornado.ioloop
 import tornado.options
-import libs.common_db as common
+import libs.common_db2 as common
 import libs.stock_web_dic as stock_web_dic
 import web.dataTableHandler as dataTableHandler
 import web.dataEditorHandler as dataEditorHandler

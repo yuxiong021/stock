@@ -1,5 +1,5 @@
 from libs.common_util import get_pro
-import libs.common_db as db
+import libs.common_db2 as db
 
 def save_index():
     pro = get_pro()

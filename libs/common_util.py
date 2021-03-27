@@ -41,7 +41,7 @@ def get_ts_data(pro, call_str, wait_seconds=61, max_trial=3, trial_count=0):
     if trial_count >= max_trial:
         raise ValueError("[ERROR]\tEXCEED MAX TRIAL!")
     try:
-        print(pro)
+        #print(call_str)
         df = eval("pro."+call_str)
         return df
     except Exception as e:

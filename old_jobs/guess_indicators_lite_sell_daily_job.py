@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 
-import libs.common_db as common
+import libs.common_db2 as common
 import pandas as pd
 import numpy as np
 import math

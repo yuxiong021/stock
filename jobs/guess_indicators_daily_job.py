@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 
-import libs.common_db as common
+from libs.common_db import DB
 import pandas as pd
 import numpy as np
 import math
@@ -26,23 +26,23 @@ def stat_all_lite_buy(tmp_datetime):
             SELECT `date`, `code`, `name`, `changepercent`, `trade`, `open`, `high`, `low`, 
                             `settlement`, `volume`, `turnoverratio`, `amount`, `per`, `pb`, `mktcap`,
                              `nmc` ,`kdjj`,`rsi_6`,`cci`
-                        FROM stock_data.guess_indicators_daily WHERE `date` = %s 
+                        FROM guess_indicators_daily WHERE `date` = %s 
                         and kdjk >= 80 and kdjd >= 70 and kdjj >= 100  and rsi_6 >= 80  and cci >= 100
     """  # and kdjj > 100 and rsi_6 > 80  and cci > 100 # 调整参数，提前获得股票增长。
-
+    global db
     try:
         # 删除老数据。
-        del_sql = " DELETE FROM `stock_data`.`guess_indicators_lite_buy_daily` WHERE `date`= '%s' " % datetime_int
-        common.insert(del_sql)
+        #del_sql = " DELETE FROM `stock_data`.`guess_indicators_lite_buy_daily` WHERE `date`= '%s' " % datetime_int
+        db.delete('guess_indicators_lite_buy_daily','date',datetime_int)
     except Exception as e:
         print("error :", e)
 
-    data = pd.read_sql(sql=sql_1, con=common.engine(), params=[datetime_int])
+    data = pd.read_sql(sql=sql_1, con=db.engine, params=[datetime_int])
     data = data.drop_duplicates(subset="code", keep="last")
     print("######## len data ########:", len(data))
 
     try:
-        common.insert_db(data, "guess_indicators_lite_buy_daily", False, "`date`,`code`")
+        db.insert_db(data, "guess_indicators_lite_buy_daily", True, "`date`,`code`")
     except Exception as e:
         print("error :", e)
 
@@ -64,20 +64,20 @@ def stat_all_lite_sell(tmp_datetime):
                         FROM stock_data.guess_indicators_daily WHERE `date` = %s 
                         and kdjk <= 20 and kdjd <= 30 and kdjj <= 10  and rsi_6 <= 20  and cci <= -100
     """
-
+    global db
     try:
         # 删除老数据。
-        del_sql = " DELETE FROM `stock_data`.`guess_indicators_lite_sell_daily` WHERE `date`= '%s' " % datetime_int
-        common.insert(del_sql)
+        #del_sql = " DELETE FROM `stock_data`.`guess_indicators_lite_sell_daily` WHERE `date`= '%s' " % datetime_int
+        db.delete('guess_indicators_lite_sell_daily', 'date', datetime_int)
     except Exception as e:
         print("error :", e)
 
-    data = pd.read_sql(sql=sql_1, con=common.engine(), params=[datetime_int])
+    data = pd.read_sql(sql=sql_1, con=db.engine, params=[datetime_int])
     data = data.drop_duplicates(subset="code", keep="last")
     print("######## len data ########:", len(data))
 
     try:
-        common.insert_db(data, "guess_indicators_lite_sell_daily", False, "`date`,`code`")
+        db.insert_db(data, "guess_indicators_lite_sell_daily", True, "`date`,`code`")
     except Exception as e:
         print("error :", e)
 
@@ -88,20 +88,25 @@ def stat_all_batch(tmp_datetime):
     print("datetime_str:", datetime_str)
     print("datetime_int:", datetime_int)
 
+    global db
     try:
         # 删除老数据。
-        del_sql = " DELETE FROM `stock_data`.`guess_indicators_daily` WHERE `date`= %s " % datetime_int
-        common.insert(del_sql)
+        #del_sql = " DELETE FROM `stock_data`.`guess_indicators_daily` WHERE `date`= %s " % datetime_int
+        db.delete('guess_indicators_daily', 'date', datetime_int)
     except Exception as e:
         print("error :", e)
 
+    # sql_count = """
+    # SELECT count(1) FROM ts_daily WHERE `trade_date` = %s and `close` > 0 and `open` > 0 and trade <= 20
+    #              and `ts_code` not like %s and `name` not like %s
+    # """
     sql_count = """
-    SELECT count(1) FROM stock_data.ts_today_all WHERE `date` = %s and `trade` > 0 and `open` > 0 and trade <= 20 
-                 and `code` not like %s and `name` not like %s
-    """
+        SELECT count(1) FROM ts_daily WHERE `trade_date` = %s and `close` > 0 and `open` > 0 and `close` <= 20 
+                     and `ts_code` not like %s
+        """
     # 修改逻辑，增加中小板块计算。 中小板：002，创业板：300 。and `code` not like %s and `code` not like %s and `name` not like %s
     # count = common.select_count(sql_count, params=[datetime_int, '002%', '300%', '%st%'])
-    count = common.select_count(sql_count, params=[datetime_int, '300%', '%st%'])
+    count = db.select_count(sql_count, params=[datetime_int, '300%'])
     print("count :", count)
     batch_size = 100
     end = int(math.ceil(float(count) / batch_size) * batch_size)
@@ -110,16 +115,24 @@ def stat_all_batch(tmp_datetime):
         print("loop :", i)
         # 查询今日满足股票数据。剔除数据：创业板股票数据，中小板股票数据，所有st股票
         # #`code` not like '002%' and `code` not like '300%'  and `name` not like '%st%'
+        # sql_1 = """
+        #             SELECT `date`, `code`, `name`, `changepercent`, `trade`, `open`, `high`, `low`,
+        #                 `settlement`, `volume`, `turnoverratio`, `amount`, `per`, `pb`, `mktcap`, `nmc`
+        #             FROM stock_data.ts_daily WHERE `date` = %s and `trade` > 0 and `open` > 0 and trade <= 20
+        #                 and `code` not like %s and `name` not like %s limit %s , %s
+        #             """
         sql_1 = """ 
-                    SELECT `date`, `code`, `name`, `changepercent`, `trade`, `open`, `high`, `low`, 
-                        `settlement`, `volume`, `turnoverratio`, `amount`, `per`, `pb`, `mktcap`, `nmc` 
-                    FROM stock_data.ts_today_all WHERE `date` = %s and `trade` > 0 and `open` > 0 and trade <= 20 
-                        and `code` not like %s and `name` not like %s limit %s , %s
-                    """
+                            SELECT `td.trade_date`, `td.ts_code`, `tsb.name`, `td.pct_chg`, `td.close`, `td.open`, `td.high`, `td.low`, 
+                                `td.pre_close`, `td.vol`, `tdb.turnover_rate`, `td.amount`, `tdb.pe`, `tdb.pb`, `tdb.total_mv`, `tdb.circ_mv`
+                            FROM ts_daily td LEFT JOIN ts_daily_basic tdb ON td.ts_code=tdb.ts_code 
+                            LEFT JOIN ts_stock_basic tsb ON td.ts_code=tsb.ts_code 
+                            WHERE `td.trade_date` = %s and `td.close` > 0 and `td.open` > 0 and td.close <= 20 
+                                and `td.ts_code` not like %s limit %s , %s
+                            """
         print(sql_1)
         # data = pd.read_sql(sql=sql_1, con=common.engine(), params=[datetime_int, '002%', '300%', '%st%', i, batch_size])
-        data = pd.read_sql(sql=sql_1, con=common.engine(), params=[datetime_int, '300%', '%st%', i, batch_size])
-        data = data.drop_duplicates(subset="code", keep="last")
+        data = pd.read_sql(sql=sql_1, con=db.engine, params=[datetime_int, '300%', '%st%', i, batch_size])
+        data = data.drop_duplicates(subset="ts_code", keep="last")
         print("########data[trade]########:", len(data))
         stat_index_all(data, i)
 
@@ -221,8 +234,9 @@ def stat_index_all(data, idx):
 
     # print(data_new.head())
     print("########insert db guess_indicators_daily idx :########:", idx)
+    global db
     try:
-        common.insert_db(data_new, "guess_indicators_daily", False, "`date`,`code`")
+        db.insert_db(data_new, "guess_indicators_daily", True, "`date`,`code`")
     except Exception as e:
         print("error :", e)
 
@@ -267,7 +281,8 @@ def apply_guess(tmp, stock_column):
     # print(code, date_start, date_end)
     # open, high, close, low, volume, price_change, p_change, ma5, ma10, ma20, v_ma5, v_ma10, v_ma20, turnover
     # 使用缓存方法。加快计算速度。
-    stock = common.get_hist_data_cache(code, date_start, date_end)
+    global db
+    stock = db.get_hist_data_cache(code, date_start, date_end)
     # 设置返回数组。
     stock_data_list = []
     stock_name_list = []
@@ -332,11 +347,12 @@ def apply_guess(tmp, stock_column):
 
 # main函数入口
 if __name__ == '__main__':
+    db = DB()
     # 使用方法传递。
-    tmp_datetime = common.run_with_args(stat_all_batch)
+    tmp_datetime = db.run_with_args(stat_all_batch)
     # 二次筛选数据。直接计算买卖股票数据。
-    tmp_datetime = common.run_with_args(stat_all_lite_buy)
-    tmp_datetime = common.run_with_args(stat_all_lite_sell)
+    tmp_datetime = db.run_with_args(stat_all_lite_buy)
+    tmp_datetime = db.run_with_args(stat_all_lite_sell)
 
 
 ####################### 老方法，弃用了。#######################
@@ -355,7 +371,8 @@ def stat_index_all_no_use(tmp_datetime):
                 and `code` not like %s and `code` not like %s and `name` not like %s
             """
     print(sql_1)
-    data = pd.read_sql(sql=sql_1, con=common.engine(), params=[datetime_int, '002%', '300%', '%st%'])
+    global db
+    data = pd.read_sql(sql=sql_1, con=db.engine, params=[datetime_int, '002%', '300%', '%st%'])
     data = data.drop_duplicates(subset="code", keep="last")
     print("########data[trade]########:", len(data))
     # print(data["trade"])
@@ -469,12 +486,12 @@ def stat_index_all_no_use(tmp_datetime):
     data_new = data_new.round(2)  # 数据保留2位小数
 
     # 删除老数据。
-    del_sql = " DELETE FROM `stock_data`.`guess_indicators_daily` WHERE `date`= %s " % datetime_int
-    common.insert(del_sql)
+    #del_sql = " DELETE FROM `stock_data`.`guess_indicators_daily` WHERE `date`= %s " % datetime_int
+    db.delete('guess_indicators_daily', 'date', datetime_int)
 
     # print(data_new.head())
     # data_new["down_rate"] = (data_new["trade"] - data_new["wave_mean"]) / data_new["wave_base"]
-    common.insert_db(data_new, "guess_indicators_daily", False, "`date`,`code`")
+    db.insert_db(data_new, "guess_indicators_daily", True, "`date`,`code`")
 
     # 进行左连接.
     # tmp = pd.merge(tmp, tmp2, on=['company_id'], how='left')

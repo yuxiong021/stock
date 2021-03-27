@@ -5,7 +5,7 @@ from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.blocking import BlockingScheduler
 
 from apscheduler.executors.pool import ProcessPoolExecutor
-import libs.common_db as common
+import libs.common_db2 as common
 
 # doc : http://apscheduler.readthedocs.io/en/latest/modules/jobstores/sqlalchemy.html
 jobstores = {

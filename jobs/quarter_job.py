@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 
-import libs.common_db as common
+from libs.common_db import DB
 import sys
 import time
 import pandas as pd
@@ -34,8 +34,9 @@ def stat_all(tmp_datetime):
     data = concat_quarter(year, quarter, data)
     # 处理重复数据，保存最新一条数据。最后一步处理，否则concat有问题。
     data = data.drop_duplicates(subset="code", keep="last")
+    global db
     # 插入数据库。
-    common.insert_db(data, "ts_report_data", False, "`quarter`,`code`")
+    db.insert_db(data, "ts_report_data", True, "`quarter`,`code`")
 
     # 盈利能力
     data = ts.get_profit_data(year, quarter)
@@ -44,7 +45,7 @@ def stat_all(tmp_datetime):
     # 处理重复数据，保存最新一条数据。
     data = data.drop_duplicates(subset="code", keep="last")
     # 插入数据库。
-    common.insert_db(data, "ts_profit_data", False, "`quarter`,`code`")
+    db.insert_db(data, "ts_profit_data", True, "`quarter`,`code`")
 
     # 营运能力
     data = ts.get_operation_data(year, quarter)
@@ -53,7 +54,7 @@ def stat_all(tmp_datetime):
     # 处理重复数据，保存最新一条数据。最后一步处理，否则concat有问题。
     data = data.drop_duplicates(subset="code", keep="last")
     # 插入数据库。
-    common.insert_db(data, "ts_operation_data", False, "`quarter`,`code`")
+    db.insert_db(data, "ts_operation_data", True, "`quarter`,`code`")
 
     # 成长能力
     data = ts.get_growth_data(year, quarter)
@@ -62,7 +63,7 @@ def stat_all(tmp_datetime):
     # 处理重复数据，保存最新一条数据。最后一步处理，否则concat有问题。
     data = data.drop_duplicates(subset="code", keep="last")
     # 插入数据库。
-    common.insert_db(data, "ts_growth_data", False, "`quarter`,`code`")
+    db.insert_db(data, "ts_growth_data", True, "`quarter`,`code`")
 
     # 偿债能力
     data = ts.get_debtpaying_data(year, quarter)
@@ -71,7 +72,7 @@ def stat_all(tmp_datetime):
     # 处理重复数据，保存最新一条数据。最后一步处理，否则concat有问题。
     data = data.drop_duplicates(subset="code", keep="last")
     # 插入数据库。
-    common.insert_db(data, "ts_debtpaying_data", False, "`quarter`,`code`")
+    db.insert_db(data, "ts_debtpaying_data", True, "`quarter`,`code`")
 
     # 现金流量
     data = ts.get_cashflow_data(year, quarter)
@@ -80,10 +81,11 @@ def stat_all(tmp_datetime):
     # 处理重复数据，保存最新一条数据。最后一步处理，否则concat有问题。
     data = data.drop_duplicates(subset="code", keep="last")
     # 插入数据库。
-    common.insert_db(data, "ts_cashflow_data", False, "`quarter`,`code`")
+    db.insert_db(data, "ts_cashflow_data", True, "`quarter`,`code`")
 
 
 # main函数入口
 if __name__ == '__main__':
     # 使用方法传递。
-    tmp_datetime = common.run_with_args(stat_all)
+    db = DB()
+    tmp_datetime = db.run_with_args(stat_all)

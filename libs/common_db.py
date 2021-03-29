@@ -161,7 +161,7 @@ class DB:
             os.makedirs(BASH_STOCK_TMP)  # 创建多个文件夹结构。
             print("######################### init tmp dir #########################")
 
-        cache_dir = BASH_STOCK_TMP % (date_end[0:7], date_end)
+        cache_dir = BASH_STOCK_TMP % (date_end[0:6], date_end)
         # 如果没有文件夹创建一个。月文件夹和日文件夹。方便删除。
         # print("cache_dir:", cache_dir)
         if not os.path.exists(cache_dir):
@@ -173,9 +173,13 @@ class DB:
             return pd.read_pickle(cache_file, compression="gzip")
         else:
             print("######### get data, write cache #########", code, date_start, date_end)
-            stock = ts.get_hist_data(code, start=date_start, end=date_end)
+            stock = pd.read_sql(sql="SELECT * FROM ts_daily td WHERE ts_code =%(ts_code)s AND trade_date BETWEEN %(date_start)s AND %(date_end)s",
+                        con=self.engine, params={'ts_code':code,'date_start':date_start,'date_end':date_end})
+            # stock['trade_date'] = pd.to_datetime(stock['trade_date'])
+            # stock['trade_date'] = stock['trade_date'].apply(lambda x: x.strftime('%Y-%m-%d'))
+            #stock = ts.get_hist_data(code, start=date_start, end=date_end)
             if stock is None:
                 return None
-            stock = stock.sort_index(0)  # 将数据按照日期排序下。
+            stock = stock.set_index('trade_date', drop=False)
             stock.to_pickle(cache_file, compression="gzip")
             return stock

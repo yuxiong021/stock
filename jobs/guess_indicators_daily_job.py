@@ -7,11 +7,14 @@ import pandas as pd
 import numpy as np
 import math
 import datetime
-import stockstats
+from stockstats import StockDataFrame as Sdf
 
 
 ### 对每日指标数据，进行筛选。将符合条件的。二次筛选出来。
 ### 只是做简单筛选
+from libs.date_util import strdate_to_datetime
+
+
 def stat_all_lite_buy(tmp_datetime):
     datetime_str = (tmp_datetime).strftime("%Y-%m-%d")
     datetime_int = (tmp_datetime).strftime("%Y%m%d")
@@ -101,12 +104,12 @@ def stat_all_batch(tmp_datetime):
     #              and `ts_code` not like %s and `name` not like %s
     # """
     sql_count = """
-        SELECT count(1) FROM ts_daily WHERE `trade_date` = %s and `close` > 0 and `open` > 0 and `close` <= 20 
-                     and `ts_code` not like %s
+        SELECT count(1) FROM ts_daily WHERE `trade_date` = (:trade_date) and `close` > 0 and `open` > 0 and `close` <= 20 
+                     and `ts_code` not like (:ts_code)
         """
     # 修改逻辑，增加中小板块计算。 中小板：002，创业板：300 。and `code` not like %s and `code` not like %s and `name` not like %s
     # count = common.select_count(sql_count, params=[datetime_int, '002%', '300%', '%st%'])
-    count = db.select_count(sql_count, params=[datetime_int, '300%'])
+    count = db.select_count(sql_count, params={'trade_date':datetime_int, 'ts_code':'300%'})
     print("count :", count)
     batch_size = 100
     end = int(math.ceil(float(count) / batch_size) * batch_size)
@@ -122,16 +125,16 @@ def stat_all_batch(tmp_datetime):
         #                 and `code` not like %s and `name` not like %s limit %s , %s
         #             """
         sql_1 = """ 
-                            SELECT `td.trade_date`, `td.ts_code`, `tsb.name`, `td.pct_chg`, `td.close`, `td.open`, `td.high`, `td.low`, 
-                                `td.pre_close`, `td.vol`, `tdb.turnover_rate`, `td.amount`, `tdb.pe`, `tdb.pb`, `tdb.total_mv`, `tdb.circ_mv`
-                            FROM ts_daily td LEFT JOIN ts_daily_basic tdb ON td.ts_code=tdb.ts_code 
+                            SELECT td.trade_date, td.ts_code, tsb.name, td.pct_chg, td.close, td.open, td.high, td.low, 
+                                td.pre_close, td.vol, tdb.turnover_rate, td.amount, tdb.pe, tdb.pb, tdb.total_mv, tdb.circ_mv
+                            FROM ts_daily td LEFT JOIN ts_daily_basic tdb ON td.ts_code=tdb.ts_code AND td.trade_date =tdb.trade_date 
                             LEFT JOIN ts_stock_basic tsb ON td.ts_code=tsb.ts_code 
-                            WHERE `td.trade_date` = %s and `td.close` > 0 and `td.open` > 0 and td.close <= 20 
-                                and `td.ts_code` not like %s limit %s , %s
-                            """
+                            WHERE td.trade_date = %(trade_date)s and td.close > 0 and td.open > 0 and td.close<=20 and td.ts_code not like %(ts_code)s and tsb.name not like %(name)s limit %(i)s,%(batch_size)s"""
         print(sql_1)
         # data = pd.read_sql(sql=sql_1, con=common.engine(), params=[datetime_int, '002%', '300%', '%st%', i, batch_size])
-        data = pd.read_sql(sql=sql_1, con=db.engine, params=[datetime_int, '300%', '%st%', i, batch_size])
+        data = pd.read_sql_query(sql=sql_1, con=db.engine, params={'trade_date':datetime_int, 'ts_code':'300%', 'name':'%st%', 'i':i,'batch_size':batch_size})
+        #data = db.select(sql_1, params={'trade_date':datetime_int, 'ts_code':'300%', 'name':'%st%', 'i':i,'batch_size':batch_size})
+        data = data.set_index(['ts_code','trade_date'], drop=False)
         data = data.drop_duplicates(subset="ts_code", keep="last")
         print("########data[trade]########:", len(data))
         stat_index_all(data, i)
@@ -223,7 +226,7 @@ def stat_index_all(data, idx):
     # 从而掌握市场买卖气势的中期技术指标。
 
     stock_column = ['adx', 'adxr', 'boll', 'boll_lb', 'boll_ub', 'cci', 'cci_20', 'close_-1_r',
-                    'close_-2_r', 'code', 'cr', 'cr-ma1', 'cr-ma2', 'cr-ma3', 'date', 'dma', 'dx',
+                    'close_-2_r', 'cr', 'cr-ma1', 'cr-ma2', 'cr-ma3', 'code', 'date', 'dma', 'dx',
                     'kdjd', 'kdjj', 'kdjk', 'macd', 'macdh', 'macds', 'mdi', 'pdi',
                     'rsi_12', 'rsi_6', 'trix', 'trix_9_sma', 'vr', 'vr_6_sma', 'wr_10', 'wr_6']
     # code     cr cr-ma1 cr-ma2 cr-ma3      date
@@ -231,12 +234,14 @@ def stat_index_all(data, idx):
     data_new = concat_guess_data(stock_column, data)
 
     data_new = data_new.round(2)  # 数据保留2位小数
-
+    data_new = data_new.reset_index().set_index(['ts_code','trade_date'])
+    del data_new['level_0']
+    del data_new['level_1']
     # print(data_new.head())
     print("########insert db guess_indicators_daily idx :########:", idx)
     global db
     try:
-        db.insert_db(data_new, "guess_indicators_daily", True, "`date`,`code`")
+        db.insert_db(data_new, "guess_indicators_daily", True, "`ts_code`,`trade_date`")
     except Exception as e:
         print("error :", e)
 
@@ -249,11 +254,11 @@ def concat_guess_data(stock_column, data):
     # 循环增加临时数据。如果要是date，和code，
     for col in stock_column:
         if col == 'date':
-            tmp_dic[col] = data["date"]
+            tmp_dic[col] = data["trade_date"]
         elif col == 'code':
-            tmp_dic[col] = data["code"]
+            tmp_dic[col] = data["ts_code"]
         else:
-            tmp_dic[col] = data["trade"]
+            tmp_dic[col] = data["close"]
     # print("##########tmp_dic: ", tmp_dic)
     print("########################## BEGIN ##########################")
     stock_guess = pd.DataFrame(tmp_dic, index=data.index.values)
@@ -263,8 +268,9 @@ def concat_guess_data(stock_column, data):
     print(stock_guess.head())
     # stock_guess.astype('float32', copy=False)
     stock_guess.drop('date', axis=1, inplace=True)  # 删除日期字段，然后和原始数据合并。
+    stock_guess.drop('code', axis=1, inplace=True)  # 删除日期字段，然后和原始数据合并。
     # print(stock_guess["5d"])
-    data_new = pd.merge(data, stock_guess, on=['code'], how='left')
+    data_new = pd.concat([data,stock_guess], axis=1)#pd.merge(data, stock_guess, on=['ts_code','trade_date'], how='left')
     print("#############")
     return data_new
 
@@ -276,8 +282,8 @@ def apply_guess(tmp, stock_column):
     date = tmp["date"]
     code = tmp["code"]
     date_end = datetime.datetime.strptime(date, "%Y%m%d")
-    date_start = (date_end + datetime.timedelta(days=-100)).strftime("%Y-%m-%d")
-    date_end = date_end.strftime("%Y-%m-%d")
+    date_start = (date_end + datetime.timedelta(days=-100)).strftime("%Y%m%d")
+    date_end = date_end.strftime("%Y%m%d")
     # print(code, date_start, date_end)
     # open, high, close, low, volume, price_change, p_change, ma5, ma10, ma20, v_ma5, v_ma10, v_ma20, turnover
     # 使用缓存方法。加快计算速度。
@@ -303,15 +309,14 @@ def apply_guess(tmp, stock_column):
     # print(stock.head())
     # open  high  close   low     volume
     # stock = pd.DataFrame({"close": stock["close"]}, index=stock.index.values)
-    stock = stock.sort_index(0)  # 将数据按照日期排序下。
+    #stock = stock.sort_index(0)  # 将数据按照日期排序下。
 
-    stock["date"] = stock.index.values  # 增加日期列。
-    stock = stock.sort_index(0)  # 将数据按照日期排序下。
+    #stock = stock.sort_index(0)  # 将数据按照日期排序下。
     # print(stock) [186 rows x 14 columns]
     # 初始化统计类
     # stockStat = stockstats.StockDataFrame.retype(pd.read_csv('002032.csv'))
-    stockStat = stockstats.StockDataFrame.retype(stock)
-
+    stock = stock.rename(columns={'vol':'volume'})
+    stockStat = Sdf.retype(stock)
     print("########################## print result ##########################")
     for col in stock_column:
         if col == 'date':
@@ -348,11 +353,13 @@ def apply_guess(tmp, stock_column):
 # main函数入口
 if __name__ == '__main__':
     db = DB()
+    dt = strdate_to_datetime('2021-03-26')
+    stat_all_batch(dt)
     # 使用方法传递。
-    tmp_datetime = db.run_with_args(stat_all_batch)
+    #tmp_datetime = db.run_with_args(stat_all_batch)
     # 二次筛选数据。直接计算买卖股票数据。
-    tmp_datetime = db.run_with_args(stat_all_lite_buy)
-    tmp_datetime = db.run_with_args(stat_all_lite_sell)
+    # tmp_datetime = db.run_with_args(stat_all_lite_buy)
+    # tmp_datetime = db.run_with_args(stat_all_lite_sell)
 
 
 ####################### 老方法，弃用了。#######################

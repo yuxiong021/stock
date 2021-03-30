@@ -44,12 +44,8 @@ class DB:
         session = Session()
         return session
 
-    def delete(self, table_name, tj_key=None, tj_val=None, is_truncate=False):
-        if is_truncate:
-            self.conn.execute('TRUNCATE TABLE `%s`;' % table_name)
-        else:
-            self.conn.execute(
-                "DELETE FROM `%s` WHERE `%s`='%s';" % (table_name, tj_key, tj_val))
+    def execute(self, sql, params={}):
+        self.conn.execute(sql, params)
 
 
     # 定义通用方法函数，插入数据库表，并创建数据库主键，保证重跑数据的时候索引唯一。

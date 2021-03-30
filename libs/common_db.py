@@ -6,10 +6,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.types import NVARCHAR
 from sqlalchemy import inspect
-import tushare as ts
 import pandas as pd
 import traceback
 
+from libs.date_util import get_today_str
 
 os.environ.setdefault('MYSQL_HOST', "localhost")
 os.environ.setdefault('MYSQL_USER', "root")
@@ -29,6 +29,7 @@ class DB:
 
     def __init__(self):
         self.engine = self._engine()
+        self.engine2 = self._engine()
         self.conn = self._conn()
 
     def _engine(self):
@@ -99,6 +100,18 @@ class DB:
         except Exception as e:
             print("error :", e)
 
+    def get_trade_date_range(self, max_tradedate_sql):
+        today = get_today_str('%04d%02d%02d')
+        sql = "SELECT cal_date FROM ts_trade_cal WHERE cal_date > ({})  AND cal_date<={}".format(max_tradedate_sql,
+                                                                                                 today)
+        result = self.select(sql)
+        result = [i._data[0] for i in result]
+        if len(result) == 1:
+            result.append(today)
+        elif len(result) == 0:
+            result.append('19900101')
+            result.append(today)
+        return result
 
 
     # 通用函数。获得日期参数。

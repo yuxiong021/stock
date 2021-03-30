@@ -25,6 +25,18 @@ from dateutil import relativedelta
 def get_today():
     return datetime.date.today()
 
+def get_today_str(pattern='%04d-%02d-%02d'):
+    """
+    explanation:
+        返回今天的日期字符串
+
+    return:
+        str
+    """
+    dt = get_today()
+    strdate = pattern % (dt.year, dt.month, dt.day)
+    return strdate
+
 def get_yesterday():
     today = datetime.date.today()
     oneday = datetime.timedelta(days=1)

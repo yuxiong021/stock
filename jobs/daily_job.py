@@ -37,11 +37,6 @@ def stat_all(tmp_datetime):
 
     global db
     if not data is None and len(data) > 0:
-        # 插入数据库。
-        # del data["reason"]
-        # data["date"] = datetime_int  # 修改时间成为int类型。
-        # data = data.drop_duplicates(subset="code", keep="last")
-        # data.head(n=1)
         data = data.set_index(['trade_date', 'ts_code'])
         db.insert_db(data, "ts_top_list", True, "`trade_date`,`ts_code`")
     else:

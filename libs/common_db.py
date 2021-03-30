@@ -74,23 +74,20 @@ class DB:
 
     # 插入数据。
     def insert(self, sql, params=()):
-        print("insert sql:" + sql)
         try:
             self.conn.execute(sql, params)
-        except  Exception as e:
+        except Exception as e:
             print("error :", e)
 
 
     # 查询数据
     def select(self, sql, params=()):
-        print("select sql:" + sql)
         result = self.conn.execute(sql, params)
         return result.fetchall()
 
 
     # 计算数量
     def select_count(self, sql, params=()):
-        print("select sql:" + sql)
         try:
             res = self.conn.execute(sql, params)
             result = res.fetchall()

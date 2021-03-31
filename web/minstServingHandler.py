@@ -3,7 +3,7 @@
 import os.path
 import json
 import subprocess
-import torndb
+#import torndb
 import tornado.escape
 from tornado import gen
 import tornado.httpserver

@@ -70,7 +70,7 @@ def stat_all(tmp_datetime):
     #                                          fields='ts_code,symbol,name,area,industry,fullname,enname,market, \
     #                                         exchange,curr_type,list_status,list_date,delist_date,is_hs')
     # data = data.set_index(['ts_code','industry'])
-    # db.insert_db(data, "ts_stock_basic", True, "`ts_code`,`industry`")
+    # db.insert_db(data, "ts_stock_basics", True, "`ts_code`,`industry`")
     #
     # 获取大盘指数基础信息
     # data = pro.index_basic(market='SZSE')

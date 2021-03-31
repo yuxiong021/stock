@@ -57,7 +57,7 @@ def stat_today_all(tmp_datetime):
     global db
 
     #先去查询所有的股票代码: 上市状态的
-    stock_codes = db.select("SELECT ts_code FROM ts_stock_basic WHERE list_status='L'")
+    stock_codes = db.select("SELECT ts_code FROM ts_stock_basics WHERE list_status='L'")
     # for ts_code in stock_codes:
     #     data = pro.daily(ts_code=ts_code._data[0],
     #                                    fields='ts_code,trade_date,open,high,low,close,pre_close,change,pct_chg,vol,amount')

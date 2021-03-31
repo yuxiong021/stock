@@ -7,6 +7,7 @@ import libs.stock_web_dic as stock_web_dic
 import web.base as webBase
 import logging
 import datetime
+import pandas as pd
 
 # info 蓝色 云财经
 # success 绿色
@@ -30,6 +31,9 @@ eastmoney_name = "查看股票"
 
 # 获得页面数据。
 class GetStockHtmlHandler(webBase.BaseHandler):
+    def initialize(self, database):
+        self.database = database
+
     @gen.coroutine
     def get(self):
         name = self.get_argument("table_name", default=None, strip=False)
@@ -63,6 +67,9 @@ class GetStockHtmlHandler(webBase.BaseHandler):
 
 # 获得股票数据内容。
 class GetStockDataHandler(webBase.BaseHandler):
+    def initialize(self, database):
+        self.database = database
+
     def get(self):
 
         # 获得分页参数。
@@ -115,9 +122,9 @@ class GetStockDataHandler(webBase.BaseHandler):
             logging.info("idx: %s, column: %s, value: %s " % (search_idx, item, val))
             # 查询sql
             if search_idx == 0:
-                search_sql = " WHERE `%s` = '%s' " % (item, val)
+                search_sql = " WHERE %s = '%s' " % (item, val)
             else:
-                search_sql = search_sql + " AND `%s` = '%s' " % (item, val)
+                search_sql = search_sql + " AND %s = '%s' " % (item, val)
             search_idx = search_idx + 1
 
         # print("stockWeb :", stock_web)
@@ -131,57 +138,54 @@ class GetStockDataHandler(webBase.BaseHandler):
                 col_tmp = stock_web.columns[key]
                 dir_tmp = order_by_dir[idx]
                 if idx != 0:
-                    order_by_sql += " ,cast(`%s` as decimal) %s" % (col_tmp, dir_tmp)
+                    order_by_sql += " ,cast(%s as decimal) %s" % (col_tmp, dir_tmp)
                 else:
-                    order_by_sql += " cast(`%s` as decimal) %s" % (col_tmp, dir_tmp)
+                    order_by_sql += " cast(%s as decimal) %s" % (col_tmp, dir_tmp)
                 idx += 1
         # 查询数据库。
         limit_sql = ""
         if int(length_param) > 0:
             limit_sql = " LIMIT %s , %s " % (start_param, length_param)
+        count_sql = " SELECT count(1) as num FROM `%s` %s " % (stock_web.table_name, search_sql)
+
         sql = " SELECT * FROM `%s` %s %s %s " % (
             stock_web.table_name, search_sql, order_by_sql, limit_sql)
-        count_sql = " SELECT count(1) as num FROM `%s` %s " % (stock_web.table_name, search_sql)
+
+        if stock_web.table_name == 'ts_stock_basics':
+            trade_date_sql = " tdb.trade_date=(SELECT MAX(trade_date) FROM ts_daily_basic WHERE ts_code=tsb.ts_code)"
+            if search_sql == "":
+                search_sql = " WHERE " + trade_date_sql
+            else:
+                search_sql += " AND " + trade_date_sql
+
+            column_sql = ""
+            i=1
+            for column in stock_web.columns:
+                column_sql += column + " as '" + column + "'"
+                if i!=len(stock_web.columns):
+                    column_sql += ', '
+                i+=1
+            sql = " SELECT %s FROM ts_stock_basics as tsb LEFT JOIN ts_daily_basic as tdb ON tsb.ts_code=tdb.ts_code  %s %s %s " % (column_sql, search_sql, order_by_sql, limit_sql)
 
         logging.info("select sql : " + sql)
         logging.info("count sql : " + count_sql)
-        stock_web_list = self.db.query(sql)
-
-        for tmp_obj in (stock_web_list):
-            logging.info("####################")
-            if type_param == "editor":
-                tmp_obj["DT_RowId"] = tmp_obj[stock_web.columns[0]]
-            # logging.info(tmp_obj)
-            try:
-                # 增加columns 字段中的【东方财富】
-                logging.info("eastmoney_name : %s " % eastmoney_name)
-                if eastmoney_name in stock_web.column_names:
-                    tmp_idx = stock_web.column_names.index(eastmoney_name)
-
-                    code_tmp = tmp_obj["code"]
-                    # 判断上海还是 深圳，东方财富 接口要求。
-                    if code_tmp.startswith("6"):
-                        code_tmp = "SH" + code_tmp
-                    else:
-                        code_tmp = "SZ" + code_tmp
-
-                    tmp_url = WEB_EASTMONEY_URL % (tmp_obj["code"], tmp_obj["code"], code_tmp)
-                    tmp_obj["eastmoney_url"] = tmp_url
-                    logging.info(tmp_idx)
-                    logging.info(tmp_obj["eastmoney_url"])
-                    # logging.info(type(tmp_obj))
-                    # tmp.column_names.insert(tmp_idx, eastmoney_name)
-            except Exception as e:
-                print("error :", e)
-
-        stock_web_size = self.db.query(count_sql)
+        #stock_web_list = self.db.execute(sql).fetchall()
+        stock_web_list = pd.read_sql_query(sql, self.db.engine)
+        stock_web_list["DT_RowId"] = stock_web_list.index.values
+        def _func(x):
+            code = x[0:6]
+            code_tmp = x[7:9]+code
+            eastmoney_url = WEB_EASTMONEY_URL % (code, code, code_tmp)
+            return eastmoney_url
+        stock_web_list["eastmoney_url"] = stock_web_list['tsb.ts_code'].apply(_func)
+        stock_web_size = self.db.select(count_sql)
         logging.info("stockWebList size : %s " % stock_web_size)
 
         obj = {
             "draw": 0,
-            "recordsTotal": stock_web_size[0]["num"],
-            "recordsFiltered": stock_web_size[0]["num"],
-            "data": stock_web_list
+            "recordsTotal": stock_web_list.shape[0], #stock_web_size[0]._row[0],#stock_web_list.shape[0],
+            "recordsFiltered": stock_web_list.shape[0],
+            "data": stock_web_list.to_json()
         }
         # logging.info("####################")
         # logging.info(obj)

@@ -128,7 +128,7 @@ def stat_all_batch(tmp_datetime):
                             SELECT td.trade_date, td.ts_code, tsb.name, td.pct_chg, td.close, td.open, td.high, td.low, 
                                 td.pre_close, td.vol, tdb.turnover_rate, td.amount, tdb.pe, tdb.pb, tdb.total_mv, tdb.circ_mv
                             FROM ts_daily td LEFT JOIN ts_daily_basic tdb ON td.ts_code=tdb.ts_code AND td.trade_date =tdb.trade_date 
-                            LEFT JOIN ts_stock_basic tsb ON td.ts_code=tsb.ts_code 
+                            LEFT JOIN ts_stock_basics tsb ON td.ts_code=tsb.ts_code 
                             WHERE td.trade_date = %(trade_date)s and td.ts_code not like %(ts_code)s and td.close > 0 and td.open > 0 and td.close<=20 and tsb.name not like %(name)s limit %(i)s,%(batch_size)s"""
         print(sql_1)
         # data = pd.read_sql(sql=sql_1, con=common.engine(), params=[datetime_int, '002%', '300%', '%st%', i, batch_size])

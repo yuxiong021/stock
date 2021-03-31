@@ -10,7 +10,7 @@ class BaseHandler(tornado.web.RequestHandler):
     def db(self):
         try:
             # check every time。
-            self.application.db.query("SELECT 1 ")
+            self.application.db.execute("SELECT 1 ")
         except Exception as e:
             print(e)
             self.application.db.reconnect()
